@@ -4,6 +4,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const multer = require('multer');
+
+const authRoutes = require('./routes/auth');
 const feedRoutes = require('./routes/feed');
 
 const  app = express();
@@ -13,7 +15,7 @@ const fileStorage = multer.diskStorage({
         cb(null,  'images');
     },
     filename: (req, file, cb) => {
-        cd(null, new Date().toString() + '-' + file.originalname);
+        cb(null, new Date().toString() + '-' + file.originalname);
     }
 })
 
@@ -42,14 +44,24 @@ app.use((req, res, next) => {
 });
 
 app.use('/feed', feedRoutes);
+app.use('/auth', authRoutes);
 
 app.use((error, req, res, next) => {
     console.log(error);
     const status = error.statusCode || 500;
     const message = error.message;
-    res.status(status).json({message: message});
+    const data = error.data;
+    res.status(status).json({message: message, data: data});
 });
 
 mongoose.connect('mongodb://localhost:27017/chatapp')
-.then(result => app.listen(8080))
+.then(result => {
+    const server = app.listen(8080);
+    const io = require('./socket').init(server);
+
+    io.on('connection', socket => {
+        console.log('client connected');
+    })
+
+})
 .catch(err => console.log(err))
